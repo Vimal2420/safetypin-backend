@@ -203,8 +203,11 @@ export const uploadProfilePhoto = async (req, res) => {
 
     if (user) {
       if (req.file) {
-        // Construct the URL to the uploaded file. 
-        user.profilePhoto = `/uploads/${req.file.filename}`;
+        // Construct URL using req.file.path redirected through the /uploads static route
+        // Normalize slashes for Windows compatibility
+        const normalizedPath = req.file.path.replace(/\\/g, '/');
+        user.profilePhoto = `/${normalizedPath}`;
+        
         await user.save();
         res.json({ message: 'Profile photo updated', profilePhoto: user.profilePhoto });
       } else {

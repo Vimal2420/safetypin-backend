@@ -29,7 +29,7 @@ router.get('/:id', getAlertDetails);
 router.get('/:id/victim-location', getAlertVictimLocation);
 router.post('/safety-check/trusted', alertTrustedContacts);
 router.post('/safety-check/volunteers', alertVolunteers);
-router.post('/evidence/:id', upload.single('evidence'), uploadEvidence);
+router.post('/evidence/:id', upload('sos').single('evidence'), uploadEvidence);
 router.post('/join/:id', joinAlert);
 router.put('/status/:id', updateAlertStatus);
 

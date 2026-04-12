@@ -13,7 +13,7 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post('/', upload.array('proofs', 5), createIncident);
+router.post('/', upload('incidents').array('proofs', 5), createIncident);
 router.get('/', authorizeRoles('authority', 'volunteer'), getIncidents);
 router.get('/map', getMapIncidents);
 router.get('/my', getMyIncidents);

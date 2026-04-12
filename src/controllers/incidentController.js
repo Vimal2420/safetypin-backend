@@ -15,8 +15,9 @@ const createIncident = async (req, res) => {
     if (req.files && req.files.length > 0) {
       req.files.forEach((file) => {
         const fileType = file.mimetype.startsWith('video') ? 'video' : 'image';
+        const normalizedPath = file.path.replace(/\\/g, '/');
         proofs.push({
-          url: `/uploads/${file.filename}`,
+          url: `/${normalizedPath}`,
           fileType: fileType,
         });
       });

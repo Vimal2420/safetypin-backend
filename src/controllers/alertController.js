@@ -249,7 +249,8 @@ const uploadEvidence = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No file provided' });
     }
 
-    const fileUrl = `/uploads/${req.file.filename}`;
+    const normalizedPath = req.file.path.replace(/\\/g, '/');
+    const fileUrl = `/${normalizedPath}`;
     const fileType = req.file.mimetype.startsWith('video') ? 'video' : 'audio';
 
     alert.evidence.push({

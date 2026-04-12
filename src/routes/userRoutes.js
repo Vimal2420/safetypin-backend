@@ -28,7 +28,7 @@ router.use(protect);
 router.get('/profile', getUserProfile);
 router.put('/update-profile', updateUserProfile);
 router.put('/change-password', changePassword);
-router.post('/profile/photo', upload.single('image'), uploadProfilePhoto);
+router.post('/profile/photo', upload('profiles').single('image'), uploadProfilePhoto);
 router.put('/status', toggleOnlineStatus);
 
 // Trusted Contacts Management

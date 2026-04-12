@@ -1,10 +1,27 @@
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 
 // Set storage engine
-const storage = multer.diskStorage({
+const storage = (category) => multer.diskStorage({
   destination(req, file, cb) {
-    cb(null, 'uploads/'); // Make sure this folder exists
+    // Determine user ID (fallback to 'anonymous' if not joined by protect middleware)
+    const userId = req.user ? req.user._id.toString() : 'anonymous';
+    
+    // Construct path: uploads/<category>/<userId>/
+    const uploadPath = path.join('uploads', category, userId);
+    
+    // Create directory recursively if it doesn't exist
+    try {
+      if (!fs.existsSync(uploadPath)) {
+        fs.mkdirSync(uploadPath, { recursive: true });
+        console.log(`[Multer] Created directory: ${uploadPath}`);
+      }
+      cb(null, uploadPath);
+    } catch (err) {
+      console.error(`[Multer] Directory creation error: ${err.message}`);
+      cb(err);
+    }
   },
   filename(req, file, cb) {
     cb(
@@ -16,7 +33,6 @@ const storage = multer.diskStorage({
 
 // Check File Type
 function checkFileType(file, cb) {
-  console.log(`[Multer] Checking file: ${file.originalname} (${file.mimetype})`);
   // Allowed ext
   const filetypes = /jpg|jpeg|png|mp4|mov|avi|mkv|aac|m4a|wav|mp3|mpeg/;
   // Check ext
@@ -27,18 +43,19 @@ function checkFileType(file, cb) {
   if (extname && mimetype) {
     return cb(null, true);
   } else {
-    console.log(`[Multer] Rejected: ext=${extname}, mime=${mimetype}`);
     cb('Error: Images, Videos, and Audio only!');
   }
 }
 
-// Init upload
-const upload = multer({
-  storage,
-  limits: { fileSize: 1024 * 1024 * 50 }, // 50MB limit for video proof
-  fileFilter: function (req, file, cb) {
-    checkFileType(file, cb);
-  },
-});
+// Factory function to create upload middleware
+const uploadMiddleware = (category = 'general') => {
+  return multer({
+    storage: storage(category),
+    limits: { fileSize: 1024 * 1024 * 50 }, // 50MB limit
+    fileFilter: function (req, file, cb) {
+      checkFileType(file, cb);
+    },
+  });
+};
 
-export default upload;
+export default uploadMiddleware;
