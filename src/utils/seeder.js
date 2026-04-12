@@ -30,18 +30,17 @@ const resourcesData = [
 ];
 
 /**
- * PRODUCTION SAFE: Only seeds resources if the collection is empty.
- * Never deletes anything.
+ * SAFE SEED: Only seeds resources (guides/helplines) if the collection is empty.
  */
 export const seedEssentialData = async () => {
   try {
     const resourceCount = await Resource.countDocuments();
     if (resourceCount === 0) {
-      console.log('🌱 Database is empty. Seeding essential Helplines and Guides...');
+      console.log('🌱 Resource collection is empty. Seeding Helplines and Guides...');
       await Resource.insertMany(resourcesData);
       console.log('✅ Essential resources seeded successfully.');
     } else {
-      console.log('✅ Resources already exist. Skipping safe seed.');
+      console.log('ℹ️ Resources already exist. Skipping.');
     }
   } catch (error) {
     console.error('❌ Error in seedEssentialData:', error);
@@ -49,38 +48,26 @@ export const seedEssentialData = async () => {
 };
 
 /**
- * DEVELOPMENT ONLY: Clears everything and adds demo users.
+ * SAFE SEED: Only seeds demo users if no users exist.
+ * Never deletes anything.
  */
 const seedDatabase = async () => {
   try {
-    // 1. Clear existing data to ensure consistency with PROJECT_STATUS.txt
-    console.log('🗑️ [DEV] Synchronizing database with demo credentials...');
-    console.log('  Deleting Users...');
-    await User.deleteMany({});
-    console.log('  Deleting Alerts...');
-    await Alert.deleteMany({});
-    console.log('  Deleting Messages...');
-    await Message.deleteMany({});
-    console.log('  Deleting Destinations...');
-    await Destination.deleteMany({});
-    console.log('  Deleting Incidents...');
-    await Incident.deleteMany({});
-    console.log('  Deleting Resources...');
-    await Resource.deleteMany({}); 
-    console.log('  Deleting GuardingSessions...');
-    await GuardingSession.deleteMany({});
-    console.log('  Deleting LocationUpdates...');
-    await LocationUpdate.deleteMany({});
-    console.log('  Deleting CheckInRequests...');
-    await CheckInRequest.deleteMany({});
-    console.log('  Deleting TravelSessions...');
-    await TravelSession.deleteMany({});
-    console.log('🧹 Cleanup complete. Seeding demo data...');
+    // 1. Check if we need to seed users
+    const userCount = await User.countDocuments();
+    if (userCount > 0) {
+      console.log('ℹ️ Users already exist. Skipping demo user seeding.');
+      // Still attempt to seed resources if they're missing
+      await seedEssentialData();
+      return;
+    }
+
+    console.log('🌱 No users found. Seeding demo accounts...');
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash('password123', salt);
 
-    // 2. Generate 5 Users (Exact match to PROJECT_STATUS.txt)
+    // 2. Generate Demo Users
     const usersData = [
       {
         name: 'Ananya Roy',
@@ -150,28 +137,25 @@ const seedDatabase = async () => {
     const ananya = users[0];
 
     // 3. Resources (Guides + Helplines)
-    await Resource.insertMany(resourcesData);
+    await seedEssentialData();
 
-    // 4. Populate TrustedContact Collection (For Dashboard Logic)
+    // 4. Populate TrustedContact Collection
     const TrustedContact = (await import('../models/TrustedContact.js')).default;
-    await TrustedContact.deleteMany({});
+    const trustedCount = await TrustedContact.countDocuments();
     
-    // Ananya's ID is used as she is the primary trusted contact in PROJECT_STATUS.txt
-    const trustedLinks = [
-      // Priya monitors Ananya
-      { ownerUserId: ananya._id, trustedUserId: users[1]._id, relationship: 'Friend' },
-      // Rohan monitors Ananya
-      { ownerUserId: ananya._id, trustedUserId: users[2]._id, relationship: 'Sister' },
-      // Ananya monitors Priya
-      { ownerUserId: users[1]._id, trustedUserId: ananya._id, relationship: 'Friend' },
-      // Ananya monitors Rohan
-      { ownerUserId: users[2]._id, trustedUserId: ananya._id, relationship: 'Brother' }
-    ];
-    await TrustedContact.insertMany(trustedLinks);
+    if (trustedCount === 0) {
+      const trustedLinks = [
+        { ownerUserId: ananya._id, trustedUserId: users[1]._id, relationship: 'Friend' },
+        { ownerUserId: ananya._id, trustedUserId: users[2]._id, relationship: 'Sister' },
+        { ownerUserId: users[1]._id, trustedUserId: ananya._id, relationship: 'Friend' },
+        { ownerUserId: users[2]._id, trustedUserId: ananya._id, relationship: 'Brother' }
+      ];
+      await TrustedContact.insertMany(trustedLinks);
+    }
 
-    console.log('✅ Database successfully synchronized with Demo data!');
+    console.log('✅ Safe seeding complete.');
   } catch (error) {
-    console.error('❌ Error synchronizing database:', error);
+    console.error('❌ Error during safe seeding:', error);
   }
 };
 

@@ -21,21 +21,13 @@ import User from './models/User.js';
 // Load env vars
 dotenv.config();
 
-// Connect to database and seed
+// Connect to database and initialize
 connectDB().then(async () => {
-  if (process.env.NODE_ENV === 'development') {
-    try {
-      await seedDatabase();
-    } catch (err) {
-      console.error('Seeding error:', err);
-    }
-  } else {
-    // Production: Only seed essential data (helplines) if the DB is empty
-    try {
-      await seedEssentialData();
-    } catch (err) {
-      console.error('Essential seeding error:', err);
-    }
+  try {
+    // Always call the non-destructive seeding logic
+    await seedDatabase();
+  } catch (err) {
+    console.error('Initialization error:', err);
   }
 }).catch(err => {
   console.error('DB Connection error:', err);
