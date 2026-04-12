@@ -15,7 +15,7 @@ import guardingRoutes from './routes/guardingRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import trustedRoutes from './routes/trustedRoutes.js';
 import policeRoutes from './routes/policeRoutes.js';
-import seedDatabase from './utils/seeder.js';
+import seedDatabase, { seedEssentialData } from './utils/seeder.js';
 import User from './models/User.js';
 
 // Load env vars
@@ -28,6 +28,13 @@ connectDB().then(async () => {
       await seedDatabase();
     } catch (err) {
       console.error('Seeding error:', err);
+    }
+  } else {
+    // Production: Only seed essential data (helplines) if the DB is empty
+    try {
+      await seedEssentialData();
+    } catch (err) {
+      console.error('Essential seeding error:', err);
     }
   }
 }).catch(err => {
