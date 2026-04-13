@@ -47,6 +47,11 @@ const travelSessionSchema = new mongoose.Schema(
         lng: Number,
       }
     ],
+    shareToken: {
+      type: String,
+      unique: true,
+      sparse: true, // Only for travel sessions that are shared
+    },
   },
   {
     timestamps: true,

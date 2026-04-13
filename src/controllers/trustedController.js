@@ -3,6 +3,7 @@ import TravelSession from '../models/TravelSession.js';
 import CheckInRequest from '../models/CheckInRequest.js';
 import User from '../models/User.js';
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 
 // @desc    Get all active sessions where the logged-in user is a trusted contact
 // @route   GET /api/trusted/active-sessions
@@ -324,6 +325,7 @@ export const startSession = async (req, res) => {
         coordinates: [lng || 0, lat || 0]
       },
       routePoints: req.body.routePoints || [],
+      shareToken: crypto.randomUUID(),
       status: 'active'
     });
 
@@ -409,6 +411,40 @@ export const verifyCheckIn = async (req, res) => {
     }
 
     res.json({ success: true, message: 'Check-in verified successfully', data: session });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get public live location for anonymous tracking
+// @route   GET /api/trusted-dashboard/public/track/:shareToken
+// @access  Public
+export const getPublicLiveLocation = async (req, res) => {
+  try {
+    const { shareToken } = req.params;
+
+    const session = await TravelSession.findOne({ shareToken, status: 'active' });
+
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Active shared session not found' });
+    }
+
+    // Get current location (latest from history or session)
+    const LocationUpdate = (await import('../models/guarding/LocationUpdate.js')).default;
+    const latest = await LocationUpdate.findOne({ 
+      session_id: session._id.toString() 
+    }).sort({ timestamp: -1 });
+
+    res.json({
+      success: true,
+      data: {
+        latitude: latest ? latest.latitude : session.currentLocation.coordinates[1],
+        longitude: latest ? latest.longitude : session.currentLocation.coordinates[0],
+        timestamp: latest ? latest.timestamp : session.lastLocationUpdate,
+        destination: session.destination,
+        routePoints: session.routePoints || []
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

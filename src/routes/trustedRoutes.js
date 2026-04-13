@@ -9,11 +9,14 @@ import {
   startSession,
   stopSession,
   updateSessionStatus,
-  verifyCheckIn
+  verifyCheckIn,
+  getPublicLiveLocation
 } from '../controllers/trustedController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+router.get('/public/track/:shareToken', getPublicLiveLocation);
 
 router.use(protect); // All dashboard routes are protected
 
