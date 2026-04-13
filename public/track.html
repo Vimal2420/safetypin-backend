@@ -160,6 +160,10 @@
             box-shadow: 0 0 15px rgba(30, 80, 255, 0.5);
         }
 
+        .user-marker-container {
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
         .loading-overlay {
             position: fixed;
             inset: 0;
@@ -233,8 +237,9 @@
         const API_BASE = '/api/trusted-dashboard/public/track';
         const POLL_INTERVAL = 8000; // 8 seconds
 
-        let map, userMarker, userCircle;
-        let lastLat, lastLng;
+        let map, userMarker, historyTrail;
+        let trailPoints = [];
+        let isFirstLoad = true;
 
         if (!token) {
             document.body.innerHTML = '<div style="padding: 40px; text-align: center;"><h1>Invalid Link</h1><p>This tracking session link is invalid or has expired.</p></div>';
@@ -279,18 +284,50 @@
         function updateUI(lat, lng, timestamp, dest) {
             const pos = [lat, lng];
             
+            // Add to trail
+            if (trailPoints.length === 0 || 
+                Math.abs(trailPoints[trailPoints.length-1][0] - lat) > 0.00001 || 
+                Math.abs(trailPoints[trailPoints.length-1][1] - lng) > 0.00001) {
+                trailPoints.push(pos);
+            }
+
             // Update Marker
             if (!userMarker) {
                 userMarker = L.marker(pos, {
                     icon: L.divIcon({
                         className: 'user-marker-container',
                         html: '<div class="user-marker"></div>',
-                        iconSize: [20, 20]
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
                     })
                 }).addTo(map);
                 map.setView(pos, 16);
             } else {
                 userMarker.setLatLng(pos);
+            }
+
+            // Update Trail
+            if (!historyTrail) {
+                historyTrail = L.polyline(trailPoints, {
+                    color: '#3B82F6',
+                    weight: 3,
+                    opacity: 0.6,
+                    dashArray: '5, 10'
+                }).addTo(map);
+            } else {
+                historyTrail.setLatLngs(trailPoints);
+            }
+
+            // Auto-center if moved significantly
+            if (isFirstLoad) {
+                map.setView(pos, 16);
+                isFirstLoad = false;
+            } else {
+                const mapCenter = map.getCenter();
+                const dist = map.distance(mapCenter, pos);
+                if (dist > 100) { // Re-center if moved > 100 meters from view center
+                    map.panTo(pos);
+                }
             }
 
             // Update Info

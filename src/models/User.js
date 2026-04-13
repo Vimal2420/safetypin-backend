@@ -98,7 +98,7 @@ const userSchema = new mongoose.Schema({
   sosTriggerWord: {
 
     type: String,
-    default: 'help',
+    default: 'red',
     trim: true,
     lowercase: true,
   },

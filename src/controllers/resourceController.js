@@ -29,7 +29,7 @@ export const getResources = async (req, res) => {
 
           for (const placeType of typesToSearch) {
             try {
-              const placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${placeType}&key=${apiKey}`;
+              const placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${placeType}&opennow=true&key=${apiKey}`;
               const response = await fetch(placesUrl);
               const data = await response.json();
 
