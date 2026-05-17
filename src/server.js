@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import http from 'http';
+import { Server } from 'socket.io';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
@@ -34,6 +36,44 @@ connectDB().then(async () => {
 });
 
 const app = express();
+const server = http.createServer(app);
+
+// Initialize Socket.io for WebRTC signaling
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log(`[Socket.io] Client connected: ${socket.id}`);
+
+  // Join a specific alert room
+  socket.on('join-room', (roomId) => {
+    socket.join(roomId);
+    console.log(`[Socket.io] Socket ${socket.id} joined room ${roomId}`);
+  });
+
+  // WebRTC Signaling: Forward offer to the room
+  socket.on('offer', (data) => {
+    socket.to(data.roomId).emit('offer', data.offer);
+  });
+
+  // WebRTC Signaling: Forward answer to the room
+  socket.on('answer', (data) => {
+    socket.to(data.roomId).emit('answer', data.answer);
+  });
+
+  // WebRTC Signaling: Forward ICE candidates
+  socket.on('ice-candidate', (data) => {
+    socket.to(data.roomId).emit('ice-candidate', data.candidate);
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`[Socket.io] Client disconnected: ${socket.id}`);
+  });
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -123,7 +163,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on http://0.0.0.0:${PORT}`);
 });
 
