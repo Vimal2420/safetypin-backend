@@ -236,9 +236,13 @@ const alertVolunteers = async (req, res) => {
 };
 
 import ffmpeg from 'fluent-ffmpeg';
+import ffmpegStatic from 'ffmpeg-static';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+// Configure FFmpeg to use the static binary (Works automatically on Windows and Render.com)
+ffmpeg.setFfmpegPath(ffmpegStatic);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
