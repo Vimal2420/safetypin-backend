@@ -298,15 +298,25 @@ const uploadEvidence = async (req, res) => {
         })
         .save(tsFilePath);
 
-      // Save the HLS URL to evidence if it's the first one, or just track chunks
+      const normalizedPath = req.file.path.replace(/\\/g, '/');
+      
+      // Save the HLS URL to evidence if it's the first one
       if (chunkIndex === 0) {
         alert.evidence.push({
           fileUrl: hlsUrl,
           fileType: 'hls_stream',
           uploadedAt: new Date()
         });
-        await alert.save();
       }
+
+      // Always push the raw video chunk so chunkIndex increments for the next upload
+      alert.evidence.push({
+        fileUrl: `/${normalizedPath}`,
+        fileType: 'video',
+        uploadedAt: new Date()
+      });
+      
+      await alert.save();
     } else {
       // Standard audio logic
       const normalizedPath = req.file.path.replace(/\\/g, '/');
@@ -316,6 +326,19 @@ const uploadEvidence = async (req, res) => {
         uploadedAt: new Date()
       });
       await alert.save();
+    }
+
+    // If alert is linked to an incident, also update incident proofs
+    if (alert.incident) {
+      const normalizedPath = req.file.path.replace(/\\/g, '/');
+      await Incident.findByIdAndUpdate(alert.incident, {
+        $push: {
+          proofs: {
+            url: `/${normalizedPath}`,
+            fileType: fileType === 'video' ? 'video' : 'image', // Incident model only supports image/video enum
+          }
+        }
+      });
     }
 
     res.status(200).json({
