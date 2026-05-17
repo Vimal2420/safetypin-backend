@@ -235,6 +235,14 @@ const alertVolunteers = async (req, res) => {
   }
 };
 
+import ffmpeg from 'fluent-ffmpeg';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // @desc    Upload evidence (audio/video) for an SOS alert
 // @route   POST /api/alerts/evidence/:id
 // @access  Private
@@ -249,34 +257,66 @@ const uploadEvidence = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No file provided' });
     }
 
-    const normalizedPath = req.file.path.replace(/\\/g, '/');
-    const fileUrl = `/${normalizedPath}`;
     const fileType = req.file.mimetype.startsWith('video') ? 'video' : 'audio';
 
-    alert.evidence.push({
-      fileUrl,
-      fileType,
-      uploadedAt: new Date()
-    });
+    if (fileType === 'video') {
+      const alertId = alert._id.toString();
+      const hlsDir = path.join(__dirname, '../../uploads/hls', alertId);
+      
+      if (!fs.existsSync(hlsDir)) {
+        fs.mkdirSync(hlsDir, { recursive: true });
+      }
 
-    await alert.save();
+      const m3u8Path = path.join(hlsDir, 'stream.m3u8');
+      
+      if (!fs.existsSync(m3u8Path)) {
+        fs.writeFileSync(m3u8Path, '#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:15\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:EVENT\n');
+      }
 
-    // If alert is linked to an incident, also update incident proofs
-    if (alert.incident) {
-      await Incident.findByIdAndUpdate(alert.incident, {
-        $push: {
-          proofs: {
-            url: fileUrl,
-            fileType: fileType === 'video' ? 'video' : 'image', // Incident model only supports image/video enum
-          }
-        }
+      const chunkIndex = alert.evidence.filter(e => e.fileType === 'video').length;
+      const tsFileName = `segment_${chunkIndex}.ts`;
+      const tsFilePath = path.join(hlsDir, tsFileName);
+      const hlsUrl = `/uploads/hls/${alertId}/stream.m3u8`;
+
+      // Trigger FFmpeg transcode async
+      ffmpeg(req.file.path)
+        .outputOptions([
+          '-c:v libx264',
+          '-c:a aac',
+          '-f mpegts'
+        ])
+        .on('end', () => {
+          fs.appendFileSync(m3u8Path, `#EXTINF:10.0,\n${tsFileName}\n`);
+          console.log(`[HLS] Segment ${chunkIndex} appended to ${alertId}`);
+        })
+        .on('error', (err) => {
+          console.error(`[HLS] Transcode Error: ${err.message}`);
+        })
+        .save(tsFilePath);
+
+      // Save the HLS URL to evidence if it's the first one, or just track chunks
+      if (chunkIndex === 0) {
+        alert.evidence.push({
+          fileUrl: hlsUrl,
+          fileType: 'hls_stream',
+          uploadedAt: new Date()
+        });
+        await alert.save();
+      }
+    } else {
+      // Standard audio logic
+      const normalizedPath = req.file.path.replace(/\\/g, '/');
+      alert.evidence.push({
+        fileUrl: `/${normalizedPath}`,
+        fileType,
+        uploadedAt: new Date()
       });
+      await alert.save();
     }
 
     res.status(200).json({
       success: true,
-      data: alert,
-      message: 'Evidence uploaded successfully'
+      message: 'Evidence chunk queued for HLS conversion'
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
