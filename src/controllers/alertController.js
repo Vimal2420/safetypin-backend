@@ -282,7 +282,7 @@ const uploadEvidence = async (req, res) => {
       const m3u8Path = path.join(hlsDir, 'stream.m3u8');
       
       if (!fs.existsSync(m3u8Path)) {
-        fs.writeFileSync(m3u8Path, '#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:15\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:EVENT\n');
+        fs.writeFileSync(m3u8Path, '#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:5\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:EVENT\n');
       }
 
       const chunkIndex = alert.evidence.filter(e => e.fileType === 'video').length;
