@@ -293,13 +293,19 @@ const uploadEvidence = async (req, res) => {
       // Trigger FFmpeg transcode async with STRICT memory limits for Render Free Tier (512MB)
       ffmpeg(req.file.path)
         .outputOptions([
-          '-c:v copy',         // Just copy the video codec! This completely eliminates processing lag.
+          '-c:v libx264',
+          '-preset ultrafast', // Use least CPU/RAM
+          '-tune zerolatency', // Optimizes for real-time streaming
+          '-x264-params keyint=30:scenecut=0', // Forces keyframes for seamless HLS
+          '-threads 1',        // Force single thread to prevent memory spikes
+          '-vf scale=-2:360',  // Downscale to 360p to maximize processing speed
+          '-b:v 400k',         // Lower video bitrate
           '-c:a aac',
-          '-b:a 64k',
+          '-b:a 64k',          // Lower audio bitrate
           '-f mpegts'
         ])
         .on('end', () => {
-          fs.appendFileSync(m3u8Path, `#EXTINF:10.0,\n${tsFileName}\n`);
+          fs.appendFileSync(m3u8Path, `#EXTINF:5.0,\n${tsFileName}\n`);
           console.log(`[HLS] Segment ${chunkIndex} appended to ${alertId}`);
         })
         .on('error', (err) => {
