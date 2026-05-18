@@ -1,6 +1,17 @@
 import Alert from '../models/Alert.js';
 import User from '../models/User.js';
 import Incident from '../models/Incident.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegStatic from 'ffmpeg-static';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Configure FFmpeg to use the static binary
+ffmpeg.setFfmpegPath(ffmpegStatic);
 
 // @desc    Trigger a new SOS alert
 // @route   POST /api/alerts/trigger
@@ -161,6 +172,15 @@ const resolveSOS = async (req, res) => {
     alert.resolvedAt = new Date();
     await alert.save();
 
+    // Finalize HLS Stream if it exists so video players stop loading
+    const m3u8Path = path.join(__dirname, '../../uploads/hls', alert._id.toString(), 'stream.m3u8');
+    if (fs.existsSync(m3u8Path)) {
+      const content = fs.readFileSync(m3u8Path, 'utf8');
+      if (!content.includes('#EXT-X-ENDLIST')) {
+        fs.appendFileSync(m3u8Path, '#EXT-X-ENDLIST\n');
+      }
+    }
+
     console.log(`✅ SOS RESOLVED for ${req.user.name}.`);
 
     res.json({
@@ -234,18 +254,6 @@ const alertVolunteers = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegStatic from 'ffmpeg-static';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-// Configure FFmpeg to use the static binary (Works automatically on Windows and Render.com)
-ffmpeg.setFfmpegPath(ffmpegStatic);
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // @desc    Upload evidence (audio/video) for an SOS alert
 // @route   POST /api/alerts/evidence/:id
@@ -507,6 +515,14 @@ const updateAlertStatus = async (req, res) => {
     alert.status = status;
     if (status === 'resolved') {
       alert.resolvedAt = new Date();
+      // Finalize HLS Stream if it exists so video players stop loading
+      const m3u8Path = path.join(__dirname, '../../uploads/hls', alert._id.toString(), 'stream.m3u8');
+      if (fs.existsSync(m3u8Path)) {
+        const content = fs.readFileSync(m3u8Path, 'utf8');
+        if (!content.includes('#EXT-X-ENDLIST')) {
+          fs.appendFileSync(m3u8Path, '#EXT-X-ENDLIST\n');
+        }
+      }
     }
     await alert.save();
 

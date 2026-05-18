@@ -58,7 +58,7 @@ const alertSchema = new mongoose.Schema(
     evidence: [
       {
         fileUrl: String,
-        fileType: { type: String, enum: ['audio', 'video'] },
+        fileType: { type: String, enum: ['audio', 'video', 'hls_stream'] },
         uploadedAt: { type: Date, default: Date.now },
       }
     ],
