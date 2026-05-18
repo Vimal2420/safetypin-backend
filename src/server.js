@@ -60,6 +60,11 @@ io.on('connection', (socket) => {
     socket.to(data.roomId).emit('offer', data.offer);
   });
 
+  // CCTV Streaming: Forward base64 frames to the room
+  socket.on('evidence-frame', (data) => {
+    socket.to(data.alertId).emit('evidence-frame', data.image);
+  });
+
   // WebRTC Signaling: Forward answer to the room
   socket.on('answer', (data) => {
     socket.to(data.roomId).emit('answer', data.answer);
