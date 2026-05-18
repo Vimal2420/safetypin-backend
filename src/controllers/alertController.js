@@ -293,13 +293,9 @@ const uploadEvidence = async (req, res) => {
       // Trigger FFmpeg transcode async with STRICT memory limits for Render Free Tier (512MB)
       ffmpeg(req.file.path)
         .outputOptions([
-          '-c:v libx264',
-          '-preset ultrafast', // Use least CPU/RAM
-          '-threads 1',        // Force single thread to prevent memory spikes
-          '-vf scale=-2:480',  // Downscale to 480p to save memory
-          '-b:v 500k',         // Lower video bitrate
+          '-c:v copy',         // Just copy the video codec! This completely eliminates processing lag.
           '-c:a aac',
-          '-b:a 64k',          // Lower audio bitrate
+          '-b:a 64k',
           '-f mpegts'
         ])
         .on('end', () => {
