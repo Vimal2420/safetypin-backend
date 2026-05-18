@@ -305,7 +305,8 @@ const uploadEvidence = async (req, res) => {
           '-f mpegts'
         ])
         .on('end', () => {
-          fs.appendFileSync(m3u8Path, `#EXTINF:5.0,\n${tsFileName}\n`);
+          // Add the DISCONTINUITY tag before appending the segment
+          fs.appendFileSync(m3u8Path, `#EXT-X-DISCONTINUITY\n#EXTINF:5.0,\n${tsFileName}\n`);
           console.log(`[HLS] Segment ${chunkIndex} appended to ${alertId}`);
         })
         .on('error', (err) => {
