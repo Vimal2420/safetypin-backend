@@ -1,6 +1,8 @@
 import User from '../models/User.js';
 import Destination from '../models/Destination.js';
 import bcrypt from 'bcryptjs';
+import Otp from '../models/Otp.js';
+import { sendSMS } from '../utils/mail.js';
 
 // @desc    Get user profile
 // @route   GET /api/user/profile
@@ -47,6 +49,18 @@ export const updateUserProfile = async (req, res) => {
     if (user) {
       // Logic change: Volunteers' changes go to pendingUpdate
       if (user.role === 'volunteer') {
+        const { otp } = req.body;
+        if (!otp) {
+            return res.status(400).json({ message: 'OTP is required to update profile' });
+        }
+        
+        const formattedPhone = user.phone;
+        const otpRecord = await Otp.findOne({ phone: formattedPhone, otp });
+        if (!otpRecord) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
+        await Otp.deleteOne({ _id: otpRecord._id });
+
         user.pendingUpdate = {
           name: req.body.name || user.name,
           phone: req.body.phone || user.phone,
@@ -95,6 +109,30 @@ export const updateUserProfile = async (req, res) => {
   }
 };
 
+// @desc    Send OTP for profile update
+// @route   POST /api/user/send-profile-update-otp
+// @access  Private
+export const sendProfileUpdateOtp = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        
+        const otpValue = Math.floor(100000 + Math.random() * 900000).toString();
+        const formattedPhone = user.phone;
+        
+        await Otp.findOneAndUpdate(
+            { phone: formattedPhone },
+            { otp: otpValue, createdAt: new Date() },
+            { upsert: true }
+        );
+        
+        await sendSMS({ to: formattedPhone, message: `Your profile update OTP is ${otpValue}. Valid for 5 minutes.`, otp: otpValue });
+        
+        res.status(200).json({ success: true, message: 'OTP sent to your registered phone number' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
 
 // @desc    Change user password
 // @route   PUT /api/user/change-password

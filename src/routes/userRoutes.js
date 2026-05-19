@@ -14,7 +14,8 @@ import {
   rejectProfileUpdate,
   getUnapprovedVolunteers,
   approveVolunteerAccount,
-  rejectVolunteerAccount
+  rejectVolunteerAccount,
+  sendProfileUpdateOtp
 } from '../controllers/userController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { authorizeRoles } from '../middleware/roleMiddleware.js';
@@ -27,6 +28,7 @@ router.use(protect);
 
 router.get('/profile', getUserProfile);
 router.put('/update-profile', updateUserProfile);
+router.post('/send-profile-update-otp', sendProfileUpdateOtp);
 router.put('/change-password', changePassword);
 router.post('/profile/photo', upload('profiles').single('image'), uploadProfilePhoto);
 router.put('/status', toggleOnlineStatus);

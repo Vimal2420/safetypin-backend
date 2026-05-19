@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import Authority from '../models/Authority.js';
 import Volunteer from '../models/Volunteer.js';
+import Otp from '../models/Otp.js';
 import { sendSMS } from '../utils/mail.js';
 
 // Generate JWT Token
@@ -20,13 +21,22 @@ const generateOtp = () => {
 // @route   POST /api/auth/register
 export const register = async (req, res) => {
     try {
-        const { userData } = req.body;
+        const { userData, otp } = req.body;
 
         if (!userData || !userData.phone || !userData.name || !userData.password) {
             return res.status(400).json({ message: 'Missing required registration fields' });
         }
 
+        if (!otp) {
+            return res.status(400).json({ message: 'OTP is required for registration' });
+        }
+
         const identifier = userData.phone.startsWith('+') ? userData.phone : `+91${userData.phone}`;
+
+        const otpRecord = await Otp.findOne({ phone: identifier, otp });
+        if (!otpRecord) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
 
         // Check for existing user
         const existingUser = await User.findOne({ 
@@ -59,6 +69,7 @@ export const register = async (req, res) => {
         });
 
         await user.save();
+        await Otp.deleteOne({ _id: otpRecord._id });
 
         console.log(`[AUTH] New registration: ${user.phone} (${user.role})`);
 
@@ -89,15 +100,57 @@ export const register = async (req, res) => {
     }
 };
 
-// @desc    Deprecated OTP functions
-export const sendOtp = async (req, res) => res.status(200).json({ message: 'OTP disabled. Use login/register.' });
-export const verifyOtp = async (req, res) => res.status(200).json({ message: 'OTP disabled. Use login/register.' });
+// @desc    Send OTP
+// @route   POST /api/auth/send-otp
+export const sendOtp = async (req, res) => {
+    try {
+        const { phone } = req.body;
+        if (!phone) return res.status(400).json({ message: 'Phone number required' });
 
-// @desc    Direct Password Login (Police, Volunteers, Users)
+        const identifier = phone.startsWith('+') ? phone : `+91${phone}`;
+        const otpValue = generateOtp();
+        
+        await Otp.findOneAndUpdate(
+            { phone: identifier },
+            { otp: otpValue, createdAt: new Date() },
+            { upsert: true, new: true }
+        );
+
+        await sendSMS({ to: identifier, message: `Your Women Safety App OTP is ${otpValue}. Valid for 5 minutes.`, otp: otpValue });
+
+        res.status(200).json({ success: true, message: 'OTP sent successfully' });
+    } catch (error) {
+        console.error('[AUTH ERROR] Send OTP failed:', error.message);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Verify OTP
+// @route   POST /api/auth/verify-otp
+export const verifyOtp = async (req, res) => {
+    try {
+        const { phone, otp } = req.body;
+        if (!phone || !otp) return res.status(400).json({ message: 'Phone and OTP required' });
+
+        const identifier = phone.startsWith('+') ? phone : `+91${phone}`;
+        const otpRecord = await Otp.findOne({ phone: identifier, otp });
+        
+        if (!otpRecord) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
+        
+        await Otp.deleteOne({ _id: otpRecord._id });
+        res.status(200).json({ success: true, message: 'OTP verified' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Direct Password Login (Police, Volunteers, Users) with OTP 2FA
 // @route   POST /api/auth/login
 export const login = async (req, res) => {
     try {
-        const { phone: identifier, password } = req.body;
+        const { phone: identifier, password, otp } = req.body;
 
         if (!identifier || !password) {
             return res.status(400).json({ message: 'Identifier and password are required' });
@@ -140,6 +193,31 @@ export const login = async (req, res) => {
         if (!isMatch) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
+
+        // Handle OTP 2FA
+        const formattedPhone = account.phone;
+
+        if (!otp) {
+            const otpValue = generateOtp();
+            await Otp.findOneAndUpdate(
+                { phone: formattedPhone },
+                { otp: otpValue, createdAt: new Date() },
+                { upsert: true }
+            );
+            await sendSMS({ to: formattedPhone, message: `Your login OTP is ${otpValue}. Valid for 5 minutes.`, otp: otpValue });
+            
+            return res.status(200).json({ 
+                requiresOtp: true, 
+                message: 'OTP sent to registered phone number',
+                phone: formattedPhone
+            });
+        }
+
+        const otpRecord = await Otp.findOne({ phone: formattedPhone, otp });
+        if (!otpRecord) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
+        await Otp.deleteOne({ _id: otpRecord._id });
 
         // If volunteer and not approved
         if (role === 'volunteer' && !account.isApproved) {
