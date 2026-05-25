@@ -195,29 +195,31 @@ export const login = async (req, res) => {
         }
 
         // Handle OTP 2FA
-        const formattedPhone = account.phone;
+        if (role !== 'authority') {
+            const formattedPhone = account.phone;
 
-        if (!otp) {
-            const otpValue = generateOtp();
-            await Otp.findOneAndUpdate(
-                { phone: formattedPhone },
-                { otp: otpValue, createdAt: new Date() },
-                { upsert: true }
-            );
-            await sendSMS({ to: formattedPhone, message: `Your login OTP is ${otpValue}. Valid for 5 minutes.`, otp: otpValue });
-            
-            return res.status(200).json({ 
-                requiresOtp: true, 
-                message: 'OTP sent to registered phone number',
-                phone: formattedPhone
-            });
-        }
+            if (!otp) {
+                const otpValue = generateOtp();
+                await Otp.findOneAndUpdate(
+                    { phone: formattedPhone },
+                    { otp: otpValue, createdAt: new Date() },
+                    { upsert: true }
+                );
+                await sendSMS({ to: formattedPhone, message: `Your login OTP is ${otpValue}. Valid for 5 minutes.`, otp: otpValue });
+                
+                return res.status(200).json({ 
+                    requiresOtp: true, 
+                    message: 'OTP sent to registered phone number',
+                    phone: formattedPhone
+                });
+            }
 
-        const otpRecord = await Otp.findOne({ phone: formattedPhone, otp });
-        if (!otpRecord) {
-            return res.status(400).json({ message: 'Invalid or expired OTP' });
+            const otpRecord = await Otp.findOne({ phone: formattedPhone, otp });
+            if (!otpRecord) {
+                return res.status(400).json({ message: 'Invalid or expired OTP' });
+            }
+            await Otp.deleteOne({ _id: otpRecord._id });
         }
-        await Otp.deleteOne({ _id: otpRecord._id });
 
         // If volunteer and not approved
         if (role === 'volunteer' && !account.isApproved) {
